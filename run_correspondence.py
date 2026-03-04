@@ -7,7 +7,8 @@ from multiprocessing.managers import BaseManager
 import shutil
 
 from utils.misc_utils import load_trajectory
-from utils.calibration_utils import load_camera_extrinsics, load_camera_intrinsics
+from utils.calibration_utils import load_camera_extrinsics, load_camera_intrinsics, load_camera_intrinsics_droid
+from utils.demo_target_calibration import DEMO_TO_TARGET_CAMERA_MAP
 from utils.geometry_utils import compute_stereo_triangulation, project_world_coord_to_image, distance_point_to_pixel_ray
 from utils.annotation_utils import concatenate_images, create_epipolar_line_overlay, create_point_overlay
 from utils.timer_utils import timer
@@ -47,8 +48,13 @@ def run_correspondence(cfg, keypoint_indices, demo_dir, scene_dir, output_dir):
 
     camera_name1, camera_name2 = cfg.setting.cameras.keys()
     assert len(cfg.setting.cameras.keys()) == 2
+    use_droid = getattr(cfg.setting, "use_droid", False)
+    target_to_demo = {v: k for k, v in DEMO_TO_TARGET_CAMERA_MAP.items()}
     camera_extrinsics_demo = {camera: load_camera_extrinsics(demo_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
-    camera_intrinsics_demo = {camera: load_camera_intrinsics(demo_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
+    if use_droid:
+        camera_intrinsics_demo = {camera: load_camera_intrinsics_droid(demo_dir, target_to_demo.get(camera, cfg.setting.cameras[camera])) for camera in cfg.setting.cameras.keys()}
+    else:
+        camera_intrinsics_demo = {camera: load_camera_intrinsics(demo_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
     camera_extrinsics_scene = {camera: load_camera_extrinsics(scene_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
     camera_intrinsics_scene = {camera: load_camera_intrinsics(scene_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
     trajectory = load_trajectory(demo_dir / "trajectory_demo.npy")

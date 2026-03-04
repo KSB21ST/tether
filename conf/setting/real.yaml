@@ -5,12 +5,16 @@ demo_names:
   # bowl-table-shelf: "pick up bowl from table and place it on middle shelf"
   # bowl-shelf-table: "pick up bowl from the middle shelf and place it on table"
   # pineapple-table-bowl: "pick up pineapple from table and place in bowl on table"
-  green-peg-red: "Insert the green object into the red object"
+  # green-peg-red: "Insert the green object into the red object"
   # pineapple-bowl-table: "pick up pineapple from bowl and place on table"
   # pineapple-shelf-table: "pick up pineapple from shelf and place on table"
   # pineapple-table-shelf: "pick up pineapple from table and place on shelf"
+  pineapple-table-bowl-droid: "pick upright bowl from table and place on left bowl"
 
 gripper_len: 0.18
+
+# use_droid: true = load demo intrinsics from DROID format (metadata + intrinsics.json in demo_dir)
+use_droid: true
 
 hand_cameras:
   hand_camera: "15512737"
