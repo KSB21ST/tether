@@ -5,7 +5,8 @@ from utils.geometry_utils import euler_to_rmat
 
 
 def load_camera_extrinsics(load_path, camera_id):
-    load_path = load_path if load_path.name == "calibration.json" else load_path / "calibration.json"
+    # load_path = load_path if load_path.name == "calibration.json" else load_path / "calibration.json"
+    load_path = "/home/kim34/projects/tether/data_real/calibration.json"
     with open(load_path, "r") as f:
         calibration_dict = json.load(f)
     camera_extrinsics_vec = np.array(calibration_dict[f"{camera_id}_left"]["extrinsics"])
@@ -17,7 +18,8 @@ def load_camera_extrinsics(load_path, camera_id):
 
 
 def load_camera_intrinsics(load_path, camera_id):
-    load_path = load_path if load_path.name == "calibration.json" else load_path / "calibration.json"
+    # load_path = load_path if load_path.name == "calibration.json" else load_path / "calibration.json"
+    load_path = "/home/kim34/projects/tether/data_real/calibration.json"
     with open(load_path, "r") as f:
         calibration_dict = json.load(f)
     camera_intrinsics = np.array(calibration_dict[f"{camera_id}_left"]["intrinsics"])

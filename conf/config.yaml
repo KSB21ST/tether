@@ -26,11 +26,11 @@ prompt_path: ./prompts
 
 vlm:
   model_smart: google/gemini-robotics-er-1.5-preview
-  api_key_smart: <YOUR_API_KEY_HERE>
+  api_key_smart: AIzaSyAUSCXlPx52BMyjJK07bgGRyoaxAD1BgAc
   thinking_budget_smart: 4096
 
   model_fast: google/gemini-robotics-er-1.5-preview
-  api_key_fast: <YOUR_API_KEY_HERE>
+  api_key_fast: AIzaSyAUSCXlPx52BMyjJK07bgGRyoaxAD1BgAc
   thinking_budget_fast: 0
 
 

@@ -20,7 +20,7 @@ class GeoAwareManager(BaseManager):
 GeoAwareManager.register("GeoAware")
 
 def load_geo_aware(port):
-    manager = GeoAwareManager(address=("localhost", port), authkey=b"geoaware")
+    manager = GeoAwareManager(address=("192.168.141.97", 50011), authkey=b"geoaware")
     manager.connect()
     return manager.GeoAware()
 
@@ -32,7 +32,7 @@ class Mast3rManager(BaseManager):
 Mast3rManager.register("Mast3r")
 
 def load_mast3r():
-    manager = Mast3rManager(address=("localhost", 50022), authkey=b"mast3r")
+    manager = Mast3rManager(address=("192.168.141.97", 50022), authkey=b"mast3r")
     manager.connect()
     return manager.Mast3r()
 

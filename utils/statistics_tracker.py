@@ -31,5 +31,6 @@ class StatisticsTracker:
 
     def log(self):
         with self.thread_lock:
-            wandb.log(self.counter)
+            # wandb.log(self.counter)
+            print("*"*100)
 

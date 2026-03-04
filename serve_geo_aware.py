@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import torch
 from torch import nn
@@ -15,13 +17,29 @@ from geo_aware.model_utils.extractor_sd import load_model, process_features_and_
 from geo_aware.model_utils.extractor_dino import ViTExtractor
 from geo_aware.model_utils.projection_network import AggregationNetwork
 
+import socket
+
+def get_local_ip():
+    """Helper function to get the actual local IP address."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Doesn't have to be reachable, this just forces the socket 
+        # to determine the default outgoing IP address.
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1' # Fallback to localhost
+    finally:
+        s.close()
+    return ip
+
 from utils.timer_utils import Timer
 timer = Timer()
 
 num_patches, image_size = 60, 480
-primary_gpu, secondary_gpu = "cuda:0", "cuda:1"
+primary_gpu, secondary_gpu = "cuda:0", "cuda:0"
 aggre_net = AggregationNetwork(feature_dims=[640,1280,1280,768], projection_dim=768, device=primary_gpu)
-aggre_net.load_pretrained_weights(torch.load('/home/exx/Projects/GeoAware-SC/results_spair/best_856.PTH'))
+aggre_net.load_pretrained_weights(torch.load('/home/kim34/projects/tether/geo_aware/results_spair/best_856.PTH'))
 sd_model, sd_aug = load_model(diffusion_ver='v1-5', image_size=num_patches*16, num_timesteps=50, block_indices=[2,5,8,11])
 extractor_vit = ViTExtractor('dinov2_vitb14', stride=14, device=primary_gpu)
 
@@ -216,9 +234,10 @@ GeoAwareManager.register("GeoAware", GeoAware)
 
 
 def serve_geo_aware(port=50011):
-    manager = GeoAwareManager(address=("localhost", port), authkey=b"geoaware")
+    manager = GeoAwareManager(address=('', port), authkey=b"geoaware")
     server = manager.get_server()
-    print(f"Serving GeoAware on localhost:{port}...")
+    server_ip = get_local_ip()
+    print(f"Serving GeoAware on {server_ip}:{port}...")
     server.serve_forever()
 
 

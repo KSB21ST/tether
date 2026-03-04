@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import shutil
 import time
@@ -16,7 +15,7 @@ from deepdiff import DeepDiff
 import os
 
 from extract_keypoint_trajectory import extract_keypoint_trajectory 
-from annotate_trajectory import annotate_demo_trajectory, annotate_rollout_trajectory
+from annotate_trajectory import annotate_demo_trajectory, annotate_rollout_trajectory, annotate_warped_trajectory
 from query_gemini import query_gemini_evaluate_success, query_gemini_plan_actions
 from run_correspondence import run_correspondence, create_correspondence_visualization, create_triangulation_visualization
 from warp_trajectory import warp_trajectory
@@ -333,10 +332,12 @@ class Runner:
         
     def run_cycle(self):
         self.prepare_bootstrap()
-        self.init_wandb()
+        # self.init_wandb()
 
         it = 0
-        while True:
+        # while True:
+        max_iterations = 100  # 원하는 반복 횟수 설정
+        while it < max_iterations:
             self.timer.start("iteration")
             if self.cfg.library_rebuild_interval > 0 and it % self.cfg.library_rebuild_interval == 0:
                 print("Rebuilding action library...")
@@ -421,13 +422,23 @@ class Runner:
 
                     print(f"Selected demo {demo_name}, running trajectory...")
                     prepare_trajectory(self.cfg, demo_dir, direction=-1, output_dir=demo_dir)
-                    remote_rollout_dir = send_trajectory(self.cfg, demo_dir, action, save=False)
-                    if remote_rollout_dir is not None:
-                        self.process_rollout_async(demo_dir, scene_dir, remote_rollout_dir, action)
-                        self.stats.add(f"action_executed/{self.action_id[action]}")
-                        self.stats.add(f"demo_executed/{self.action_id[action]}/{demo_name}")
-                    else:
-                        print(f"Failed to send trajectory for {demo_name}!")
+                    # remote_rollout_dir = send_trajectory(self.cfg, demo_dir, action, save=False)
+                    # if remote_rollout_dir is not None:
+                    # self.process_rollout_async(demo_dir, scene_dir, remote_rollout_dir, action)
+                    # self.stats.add(f"action_executed/{self.action_id[action]}")
+                    # self.stats.add(f"demo_executed/{self.action_id[action]}/{demo_name}")
+                    # else:
+                    #     print(f"Failed to send trajectory for {demo_name}!")
+                    pipeline_dir = demo_dir / "pipeline"
+                    create_correspondence_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_triangulation_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    annotate_warped_trajectory(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+
+                    self.stats.add(f"action_executed/{self.action_id[action]}")
+                    self.stats.add(f"demo_executed/{self.action_id[action]}/{demo_name}")
+
+                    print(f"Warped trajectory saved at {pipeline_dir / 'trajectory_final.npy'}")
+                    print("Run: python visualize_trajectory.py <demo_dir> to plot the trajectory.")
                     break
 
             time = self.timer.end("iteration")

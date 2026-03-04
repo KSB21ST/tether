@@ -182,3 +182,7 @@ wandb/
 *.svo2
 *.h5
 .DS_Store
+data_real/
+geo_aware/
+mast3r/
+demo_0303/

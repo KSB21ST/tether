@@ -4,17 +4,36 @@ import numpy as np
 from multiprocessing.managers import BaseManager
 import hashlib
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'mast3r'))
+
 import mast3r.utils.path_to_dust3r
 from mast3r.model import AsymmetricMASt3R
 from mast3r.fast_nn import fast_reciprocal_NNs
 from dust3r.inference import inference
 from dust3r.utils.image import load_images
+import socket
+
+def get_local_ip():
+    """Helper function to get the actual local IP address."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Doesn't have to be reachable, this just forces the socket 
+        # to determine the default outgoing IP address.
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1' # Fallback to localhost
+    finally:
+        s.close()
+    return ip
 
 from utils.timer_utils import Timer
 timer = Timer()
 
 model_name = "naver/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric"
-device = "cuda:1"
+device = "cuda:0"
 model = AsymmetricMASt3R.from_pretrained(model_name).to(device)
 
 
@@ -148,9 +167,10 @@ Mast3rManager.register("Mast3r", Mast3r)
 
 
 def serve_mast3r():
-    manager = Mast3rManager(address=("localhost", 50022), authkey=b"mast3r")
+    manager = Mast3rManager(address=('', 50022), authkey=b"mast3r")
     server = manager.get_server()
-    print("Serving Mast3r on localhost:50022...")
+    server_ip = get_local_ip()
+    print(f"Serving Mast3r on {server_ip}:50022...")
     server.serve_forever()
 
 

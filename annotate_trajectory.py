@@ -109,3 +109,48 @@ def annotate_rollout_trajectory(cfg, rollout_dir, demo_dir, output_dir, densify_
             align_action=True
         )
 
+def annotate_warped_trajectory(cfg, demo_dir, scene_dir, output_dir, densify_factor=64):
+    """
+    Annotate trajectory_final.npy (warped output) onto scene images.
+    No robot rollout required - overlays the warped trajectory on the target scene.
+    """
+    output_dir = output_dir / "annotations"
+    output_dir.mkdir(exist_ok=True)
+
+    trajectory_path = demo_dir / "pipeline" / "trajectory_final.npy"
+    if not trajectory_path.exists():
+        print(f"trajectory_final.npy not found at {trajectory_path}, skipping annotation")
+        return
+
+    trajectory = load_trajectory(trajectory_path)
+    demo_keypoint_path = demo_dir / "gripper_keypoints.npy"
+
+    # Scale keypoint indices if warped trajectory has different length than demo
+    keypoint_path = None
+    if demo_keypoint_path.exists():
+        demo_trajectory = load_trajectory(demo_dir / "trajectory_demo.npy")
+        demo_keypoints = np.load(demo_keypoint_path)
+        if len(demo_trajectory) == len(trajectory):
+            keypoint_path = demo_keypoint_path
+        else:
+            # Scale indices proportionally
+            scale = (len(trajectory) - 1) / max(1, len(demo_trajectory) - 1)
+            scaled = np.clip(np.round(demo_keypoints * scale).astype(int), 0, len(trajectory) - 1)
+            scaled = np.unique(scaled)
+            keypoint_path = output_dir.parent / "warped_keypoints.npy"
+            np.save(keypoint_path, scaled)
+
+    for camera_name, camera_id in cfg.setting.cameras.items():
+        media_path = scene_dir / f"{camera_name}.jpg"
+        annotate_trajectory(
+            cfg,
+            trajectory_path=trajectory_path,
+            keypoint_path=keypoint_path,
+            media_path=media_path,
+            extrinsics_path=scene_dir,
+            intrinsics_path=scene_dir,
+            camera_id=camera_id,
+            output_path=output_dir / f"trajectory_{camera_name}.mp4",
+            densify_factor=densify_factor,
+            align_action=False,
+        )
