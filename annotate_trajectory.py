@@ -6,7 +6,8 @@ import scipy.interpolate
 import imageio
 import hydra
 
-from utils.calibration_utils import load_camera_extrinsics, load_camera_intrinsics
+from utils.calibration_utils import load_camera_extrinsics, load_camera_intrinsics, load_camera_extrinsics_droid, load_camera_intrinsics_droid
+from utils.demo_target_calibration import DEMO_TO_TARGET_CAMERA_MAP, get_demo_cameras
 from utils.geometry_utils import transform_trajectory_world_to_camera
 from utils.annotation_utils import create_trajectory_overlay, create_keypoint_overlays, create_gripper_overlays, create_label_overlay 
 from utils.misc_utils import load_trajectory
@@ -23,13 +24,17 @@ def annotate_trajectory(
     output_path,
     densify_factor=64,
     align_action=False,
+    camera_extrinsics=None,
+    camera_intrinsics=None,
 ):
     if not media_path.exists():
         print(f"Media path {media_path} does not exist for annotation!")
         return
 
-    camera_extrinsics = load_camera_extrinsics(extrinsics_path, camera_id)
-    camera_intrinsics = load_camera_intrinsics(intrinsics_path, camera_id)
+    if camera_extrinsics is None:
+        camera_extrinsics = load_camera_extrinsics(extrinsics_path, camera_id)
+    if camera_intrinsics is None:
+        camera_intrinsics = load_camera_intrinsics(intrinsics_path, camera_id)
     
     trajectory = load_trajectory(trajectory_path)
     camera_frame_trajectory = transform_trajectory_world_to_camera(trajectory, camera_extrinsics)
@@ -89,6 +94,68 @@ def annotate_demo_trajectory(cfg, demo_dir, output_dir, densify_factor=64):
             camera_id=camera_id,
             output_path=output_dir / f"trajectory_{camera_name}.mp4",
             densify_factor=densify_factor
+        )
+
+
+def annotate_demo_trajectory_droid(cfg, demo_dir, output_dir, densify_factor=64):
+    """
+    Annotate demo trajectory for DROID-format demos.
+
+    Reads metadata_*.json in demo_dir to get the DROID camera names (wrist/ext1/ext2)
+    and their serial numbers, then maps them to target camera names via
+    DEMO_TO_TARGET_CAMERA_MAP (e.g. ext1 -> varied_camera_1).
+
+    Calibration is loaded from the demo_dir itself (metadata_*.json for extrinsics,
+    intrinsics.json for intrinsics) rather than from the target calibration.json.
+
+    Media is read from recordings/frames/{target_name}/ (pre-extracted frame folders)
+    or recordings/MP4/{serial}.mp4 as a fallback.
+    """
+    from pathlib import Path
+
+    demo_dir = Path(demo_dir)
+    output_dir = Path(output_dir) / "annotations"
+    output_dir.mkdir(exist_ok=True)
+
+    # {droid_name: serial}  e.g. {"wrist": "18026681", "ext1": "22008760", "ext2": "24400334"}
+    demo_cam_serials = get_demo_cameras(demo_dir)
+    # Inverse map: target name -> droid name  e.g. {"varied_camera_1": "ext1", ...}
+    target_to_droid = {v: k for k, v in DEMO_TO_TARGET_CAMERA_MAP.items()}
+
+    trajectory_path = demo_dir / "trajectory.npz"
+    keypoint_path = demo_dir / "gripper_keypoints.npy"
+
+    for camera_name in cfg.setting.cameras:
+        droid_name = target_to_droid.get(camera_name)
+        if droid_name is None:
+            print(f"No DROID mapping for camera '{camera_name}', skipping annotation")
+            continue
+
+        serial = demo_cam_serials.get(droid_name)
+        if serial is None:
+            print(f"No serial found for DROID camera '{droid_name}' in {demo_dir}, skipping")
+            continue
+
+        # Load calibration directly from the demo metadata
+        extrinsics = load_camera_extrinsics_droid(demo_dir, droid_name)
+        intrinsics = load_camera_intrinsics_droid(demo_dir, droid_name)
+
+        # Prefer pre-extracted frame folder; fall back to original MP4
+        frames_dir = demo_dir / "recordings" / "frames" / camera_name
+        mp4_path = demo_dir / "recordings" / "MP4" / f"{serial}.mp4"
+
+        annotate_trajectory(
+            cfg,
+            trajectory_path=trajectory_path,
+            keypoint_path=keypoint_path if keypoint_path.exists() else None,
+            media_path=mp4_path,
+            extrinsics_path=demo_dir,
+            intrinsics_path=demo_dir,
+            camera_id=droid_name,
+            output_path=output_dir / f"trajectory_{camera_name}.mp4",
+            densify_factor=densify_factor,
+            camera_extrinsics=extrinsics,
+            camera_intrinsics=intrinsics,
         )
 
 

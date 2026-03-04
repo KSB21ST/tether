@@ -15,7 +15,7 @@ from deepdiff import DeepDiff
 import os
 
 from extract_keypoint_trajectory import extract_keypoint_trajectory 
-from annotate_trajectory import annotate_demo_trajectory, annotate_rollout_trajectory, annotate_warped_trajectory
+from annotate_trajectory import annotate_demo_trajectory, annotate_demo_trajectory_droid, annotate_rollout_trajectory, annotate_warped_trajectory
 from query_gemini import query_gemini_evaluate_success, query_gemini_plan_actions
 from run_correspondence import run_correspondence, create_correspondence_visualization, create_triangulation_visualization
 from warp_trajectory import warp_trajectory
@@ -178,7 +178,11 @@ class Runner:
                 demo_dir = self.cfg.demo_path / demo_dir.name
                 prepare_trajectory(self.cfg, demo_dir, direction=1, output_dir=demo_dir)
                 extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
-                annotate_demo_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+                use_droid = getattr(self.cfg.setting, "use_droid", False)
+                if use_droid:
+                    annotate_demo_trajectory_droid(self.cfg, demo_dir, output_dir=demo_dir)
+                else:
+                    annotate_demo_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
                 metadata = {
                     "action": action,
                     "articulated": False,
@@ -336,7 +340,7 @@ class Runner:
 
         it = 0
         # while True:
-        max_iterations = 100  # 원하는 반복 횟수 설정
+        max_iterations = 2  # 원하는 반복 횟수 설정
         while it < max_iterations:
             self.timer.start("iteration")
             if self.cfg.library_rebuild_interval > 0 and it % self.cfg.library_rebuild_interval == 0:
@@ -399,10 +403,13 @@ class Runner:
                         print(f"Running pipeline with trajectory {demo_name}")
                         demo_dir = self.cfg.demo_path / demo_name if (self.cfg.demo_path / demo_name).exists() else self.cfg.rollout_path / demo_name
                         warp_result = self.warp_trajectory(demo_dir, scene_dir)
-                        if warp_result is None:
+                        if warp_result is None:                            # For debugging
+                            create_correspondence_visualization(self.cfg, demo_dir, scene_dir, output_dir=demo_dir / f"pipeline")
+                            # create_triangulation_visualization(self.cfg, demo_dir, scene_dir, output_dir=demo_dir / f"pipeline")
+                            # import ipdb; ipdb.set_trace()
                             self.ucb.update_arm(f"{self.action_id[action]}/{demo_name}", False)
                             self.stats.add(f"demo_corres_failed/{self.action_id[action]}/{demo_name}")
-                            shutil.rmtree(demo_dir / "pipeline")
+                            # shutil.rmtree(demo_dir / "pipeline")
                         else:
                             warped_trajectory, warping_infos, warp = warp_result
                             candidate_warpings.append((demo_name, warped_trajectory, warping_infos, warp))

@@ -7,7 +7,7 @@ from multiprocessing.managers import BaseManager
 import shutil
 
 from utils.misc_utils import load_trajectory
-from utils.calibration_utils import load_camera_extrinsics, load_camera_intrinsics, load_camera_intrinsics_droid
+from utils.calibration_utils import load_camera_extrinsics, load_camera_intrinsics, load_camera_extrinsics_droid, load_camera_intrinsics_droid
 from utils.demo_target_calibration import DEMO_TO_TARGET_CAMERA_MAP
 from utils.geometry_utils import compute_stereo_triangulation, project_world_coord_to_image, distance_point_to_pixel_ray
 from utils.annotation_utils import concatenate_images, create_epipolar_line_overlay, create_point_overlay
@@ -52,8 +52,10 @@ def run_correspondence(cfg, keypoint_indices, demo_dir, scene_dir, output_dir):
     target_to_demo = {v: k for k, v in DEMO_TO_TARGET_CAMERA_MAP.items()}
     camera_extrinsics_demo = {camera: load_camera_extrinsics(demo_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
     if use_droid:
+        camera_extrinsics_demo = {camera: load_camera_extrinsics_droid(demo_dir, target_to_demo.get(camera, camera))for camera in cfg.setting.cameras.keys()}
         camera_intrinsics_demo = {camera: load_camera_intrinsics_droid(demo_dir, target_to_demo.get(camera, cfg.setting.cameras[camera])) for camera in cfg.setting.cameras.keys()}
     else:
+        camera_extrinsics_demo = {camera: load_camera_extrinsics(demo_dir, target_to_demo.get(camera, camera))for camera in cfg.setting.cameras.keys()}
         camera_intrinsics_demo = {camera: load_camera_intrinsics(demo_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
     camera_extrinsics_scene = {camera: load_camera_extrinsics(scene_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
     camera_intrinsics_scene = {camera: load_camera_intrinsics(scene_dir, cfg.setting.cameras[camera]) for camera in cfg.setting.cameras.keys()}
@@ -177,6 +179,7 @@ def run_correspondence(cfg, keypoint_indices, demo_dir, scene_dir, output_dir):
                     direction=1, magnitude=anchor_offset_candidates[i]
                 )
             except Exception as e:
+                print(e)
                 print(f"Triangulation error for correspondence {i}, keypoint {keypoint_idx}")
                 continue
             

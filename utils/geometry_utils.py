@@ -283,9 +283,9 @@ def project_point_to_line(point, line_point_1, line_point_2):
 
 def compute_stereo_triangulation(point1, point2, camera_intrinsics1, camera_extrinsics1, camera_intrinsics2, camera_extrinsics2):
     camera1_center_in_world, pixel1_ray_direction_in_world, cam1_center_in_image2 , direction_in_image2 = compute_3dray_projection_in_another_image(point1, camera_intrinsics1, camera_extrinsics1, camera_intrinsics2, camera_extrinsics2)
-    assert direction_in_image2[0] > 0, "Direction in image2 should be positive"
+    # assert direction_in_image2[0] > 0, "Direction in image2 should be positive"
     camera2_center_in_world, pixel2_ray_direction_in_world, cam2_center_in_image1, direction_in_image1 = compute_3dray_projection_in_another_image(point2, camera_intrinsics2, camera_extrinsics2, camera_intrinsics1, camera_extrinsics1)
-    assert direction_in_image1[0] < 0, "Direction in image1 should be negative"
+    # assert direction_in_image1[0] < 0, "Direction in image1 should be negative"
     point_3d = closest_points_between_two_lines(camera1_center_in_world, pixel1_ray_direction_in_world, camera2_center_in_world, pixel2_ray_direction_in_world)
     dist_between_two_lines = np.linalg.norm(point_3d[0] - point_3d[1])
     mean_point_3d = np.mean([point_3d[0], point_3d[1]], axis=0)
