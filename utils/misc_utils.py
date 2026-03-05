@@ -68,6 +68,7 @@ def prepare_trajectory(cfg, demo_dir, direction, output_dir):
         trajectory = load_trajectory(demo_dir / "pipeline" / "trajectory_warp.npy")
         trajectory = modify_trajectory_position(trajectory, direction, magnitude=cfg.setting.gripper_len)
         np.save(output_dir / "pipeline" / "trajectory_final.npy", trajectory)
+        np.save(output_dir / "pipeline" / "trajectory_final_xyz.npy", trajectory[:, :3])
 
 
 def format_video(video_path):
