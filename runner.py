@@ -18,6 +18,7 @@ from extract_keypoint_trajectory import extract_keypoint_trajectory
 from annotate_trajectory import annotate_demo_trajectory, annotate_demo_trajectory_droid, annotate_rollout_trajectory, annotate_warped_trajectory
 from query_gemini import query_gemini_evaluate_success, query_gemini_plan_actions
 from run_correspondence import run_correspondence, create_correspondence_visualization, create_triangulation_visualization
+from run_correspondence_gdino import create_correspondence_visualization_gdino, create_triangulation_visualization_gdino, create_bbox_visualization,
 from warp_trajectory import warp_trajectory
 from ucb import UCB
 
@@ -211,6 +212,31 @@ class Runner:
         except Exception as e:
             print(f"Error while warping trajectory: {e}")
             return
+        return warped_trajectory, warping_infos, warp
+
+    def warp_trajectory_gdino(self, demo_dir, scene_dir, grounding_texts=None):
+        """Same as warp_trajectory() but uses Grounding-DINO-guided correspondence."""
+        from run_correspondence_gdino import run_correspondence_gdino  # lazy import: connects to DINO server only when needed
+
+        pipeline_dir = demo_dir / "pipeline"
+        if pipeline_dir.exists():
+            shutil.rmtree(pipeline_dir)
+        pipeline_dir.mkdir()
+
+        prepare_trajectory(self.cfg, demo_dir, direction=1, output_dir=demo_dir)
+        keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+        gripper_indices = np.sort(np.concatenate((open_indices, close_indices)))
+        warp = run_correspondence_gdino(
+            self.cfg, gripper_indices, demo_dir, scene_dir,
+            output_dir=pipeline_dir, grounding_texts=grounding_texts,
+        )
+        if warp is None:
+            return None
+        try:
+            warped_trajectory, warping_infos = warp_trajectory(self.cfg, demo_dir, output_dir=pipeline_dir)
+        except Exception as e:
+            print(f"Error while warping trajectory: {e}")
+            return None
         return warped_trajectory, warping_infos, warp
     
     @timer
@@ -453,7 +479,87 @@ class Runner:
             self.stats.add("timing/total", time)
             self.stats.log()
             it += 1
-    
+
+    def run_cycle_dino(self, grounding_texts=None):
+        """
+        Minimal test loop for Grounding-DINO correspondence.
+
+        Mirrors run_cycle() but:
+          - Replaces run_correspondence with run_correspondence_gdino.
+          - Saves bbox, correspondence, and triangulation visualisations.
+          - Skips VLM planning, UCB arm selection, robot execution, and wandb.
+
+        Run with:  python runner.py mode=dino
+
+        Args:
+            grounding_texts: Optional list of per-keypoint text prompts for
+                             Grounding-DINO.  Defaults to the task description
+                             from each demo's metadata.json.
+        """
+        from run_correspondence_gdino import (  # lazy import: connects to DINO server only here
+            create_correspondence_visualization_gdino,
+            create_triangulation_visualization_gdino,
+            create_bbox_visualization,
+        )
+
+        self.prepare_bootstrap()
+
+        scene_name = collect_scene_image(self.cfg)
+        if scene_name is None:
+            print("Failed to prepare scene! Are the cameras connected?")
+            return
+        scene_dir = self.cfg.scene_path / scene_name
+
+        # Iterate over every action and every demo once
+        for action, demo_names in self.action_library.items():
+            print(f"\n{'='*50}")
+            print(f"Action: {action}  |  Scene: {scene_name}")
+            print(f"{'='*50}")
+
+            for demo_name in demo_names:
+                demo_dir = (
+                    self.cfg.demo_path / demo_name
+                    if (self.cfg.demo_path / demo_name).exists()
+                    else self.cfg.rollout_path / demo_name
+                )
+                print(f"\n--- Demo: {demo_name} ---")
+
+                warp_result = self.warp_trajectory_gdino(demo_dir, scene_dir, grounding_texts)
+
+                pipeline_dir = demo_dir / "pipeline"
+
+                # Always save bbox visualisations (written by run_correspondence_gdino,
+                # but re-render from JSON in case they need refreshing)
+                try:
+                    create_bbox_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    print(f"  Bounding-box visualisations -> {pipeline_dir}/correspondence/bboxes/")
+                except Exception as e:
+                    print(f"  bbox visualisation failed: {e}")
+
+                if warp_result is None:
+                    print(f"  Correspondence FAILED for {demo_name}")
+                    # Still try to render correspondence images even on failure
+                    try:
+                        create_correspondence_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    except Exception as e:
+                        print(f"  correspondence visualisation failed: {e}")
+                    continue
+
+                warped_trajectory, warping_infos, warp = warp_result
+
+                try:
+                    create_correspondence_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_triangulation_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    print(f"  Correspondence OK  -> {pipeline_dir}/correspondence/")
+                except Exception as e:
+                    print(f"  visualisation failed: {e}")
+
+                # Log position deltas for a quick sanity check
+                for kp_idx, kp_data in warp.items():
+                    if "position_delta" in kp_data:
+                        delta = np.linalg.norm(kp_data["position_delta"])
+                        print(f"  keypoint {kp_idx} position delta: {delta:.4f} m")
+
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def run_pipeline(cfg: DictConfig):
@@ -481,6 +587,8 @@ def run_pipeline(cfg: DictConfig):
         runner.run_cycle()
     elif cfg.mode == "single":
         runner.run_single(cfg.action)
+    elif cfg.mode == "dino":
+        runner.run_cycle_dino()
     else:
         raise ValueError(f"Unknown mode {cfg.mode}")
 

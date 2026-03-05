@@ -129,10 +129,10 @@ class GeoAware:
         timer.end("preprocess")
         with torch.no_grad():
             timer.start("get_processed_features_source")
-            self.source_feat, source_cache_hit = self.get_processed_features(self.source_image, cache_path=source_cache_path, refresh_cache=refresh_cache)
+            self.source_feat, source_cache_hit = self.get_processed_features(self.source_image, text="bowl", cache_path=source_cache_path, refresh_cache=refresh_cache)
             timer.end("get_processed_features_source")
             timer.start("get_processed_features_target")
-            self.target_feat, target_cache_hit = self.get_processed_features(self.target_image, cache_path=target_cache_path, refresh_cache=refresh_cache)
+            self.target_feat, target_cache_hit = self.get_processed_features(self.target_image, text="pot", cache_path=target_cache_path, refresh_cache=refresh_cache)
             timer.end("get_processed_features_target")
             timer.start("upsample")
             self.source_feat_upsample = nn.Upsample(size=(image_size, image_size), mode='bilinear')(self.source_feat).to(secondary_gpu)  # 1, C, H, W
