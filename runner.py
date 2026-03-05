@@ -18,7 +18,6 @@ from extract_keypoint_trajectory import extract_keypoint_trajectory
 from annotate_trajectory import annotate_demo_trajectory, annotate_demo_trajectory_droid, annotate_rollout_trajectory, annotate_warped_trajectory
 from query_gemini import query_gemini_evaluate_success, query_gemini_plan_actions
 from run_correspondence import run_correspondence, create_correspondence_visualization, create_triangulation_visualization
-from run_correspondence_gdino import create_correspondence_visualization_gdino, create_triangulation_visualization_gdino, create_bbox_visualization,
 from warp_trajectory import warp_trajectory
 from ucb import UCB
 
@@ -559,6 +558,20 @@ class Runner:
                     if "position_delta" in kp_data:
                         delta = np.linalg.norm(kp_data["position_delta"])
                         print(f"  keypoint {kp_idx} position delta: {delta:.4f} m")
+            
+            # After valid trajectory is found
+            prepare_trajectory(self.cfg, demo_dir, direction=-1, output_dir=demo_dir)
+            pipeline_dir = demo_dir / "pipeline"
+            create_correspondence_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+            create_triangulation_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+            annotate_warped_trajectory(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+
+            self.stats.add(f"action_executed/{self.action_id[action]}")
+            self.stats.add(f"demo_executed/{self.action_id[action]}/{demo_name}")
+
+            print(f"Warped trajectory saved at {pipeline_dir / 'trajectory_final.npy'}")
+            print("Run: python visualize_trajectory.py <demo_dir> to plot the trajectory.")
+            break
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
