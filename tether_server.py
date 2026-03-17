@@ -34,6 +34,7 @@ from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
 from utils.misc_utils import prepare_trajectory
+from annotate_trajectory import annotate_warped_trajectory
 
 # ── Tuneable constants ────────────────────────────────────────────────────────
 PORT             = 8000
@@ -207,10 +208,15 @@ def check_trajectory():
     _section("Running DINO correspondence + warp")
     warp_result = _runner.warp_trajectory_gdino(_demo_dir, _scene_dir, GROUNDING_TEXTS)
 
-    # 2b. Save visualizations (best-effort, never crash the server)
+    # 2b. Always generate trajectory_final.npy right after a successful warp so
+    #     visualizations can use it regardless of whether positions changed.
+    pipeline_dir = _demo_dir / "pipeline"
+    if warp_result is not None:
+        prepare_trajectory(_runner.cfg, _demo_dir, direction=-1, output_dir=_demo_dir)
+
+    # 2c. Save visualizations (best-effort, never crash the server)
     _section("Saving visualizations")
     import datetime
-    pipeline_dir = _demo_dir / "pipeline"
     vis_ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     vis_archive_dir = _demo_dir / "pipeline_history" / f"step_{_request_count:04d}_{vis_ts}"
     try:
@@ -220,7 +226,6 @@ def check_trajectory():
             create_triangulation_visualization_gdino,
             create_geoaware_visualization,
             create_mast3r_visualization,
-            create_trajectory_video,
         )
         create_bbox_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
         if warp_result is not None:
@@ -228,11 +233,11 @@ def check_trajectory():
             create_triangulation_visualization_gdino(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
             create_geoaware_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
             create_mast3r_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
-            create_trajectory_video(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
+            annotate_warped_trajectory(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
 
-        # Copy correspondence/ and trajectory/ into timestamped archive
+        # Copy correspondence/ and annotations/ into timestamped archive
         vis_archive_dir.mkdir(parents=True, exist_ok=True)
-        for subfolder in ("correspondence", "trajectory"):
+        for subfolder in ("correspondence", "annotations"):
             src = pipeline_dir / subfolder
             if src.exists():
                 shutil.copytree(src, vis_archive_dir / subfolder)
@@ -276,9 +281,8 @@ def check_trajectory():
         _banner("─  NO CHANGE DETECTED  →  changed=False")
         return jsonify({"changed": False})
 
-    # 5. Positions changed → finalise & return xyz waypoints ---------------
+    # 5. Positions changed → return xyz waypoints (trajectory already prepared in 2b)
     _last_pos = new_pos
-    prepare_trajectory(_runner.cfg, _demo_dir, direction=-1, output_dir=_demo_dir)
     xyz = np.load(_demo_dir / "pipeline" / "trajectory_final_xyz.npy")
     _banner(f"★  KEYPOINTS CHANGED  →  sending {len(xyz)} waypoints  →  OmniGuide", char="★")
     return jsonify({"changed": True, "waypoints": xyz.tolist()})
