@@ -37,7 +37,7 @@ from utils.timer_utils import Timer
 timer = Timer()
 
 num_patches, image_size = 60, 480
-primary_gpu, secondary_gpu = "cuda:0", "cuda:0"
+primary_gpu, secondary_gpu = "cuda:0", "cuda:1"
 aggre_net = AggregationNetwork(feature_dims=[640,1280,1280,768], projection_dim=768, device=primary_gpu)
 aggre_net.load_pretrained_weights(torch.load('/home/kim34/projects/tether/geo_aware/results_spair/best_856.PTH'))
 sd_model, sd_aug = load_model(diffusion_ver='v1-5', image_size=num_patches*16, num_timesteps=50, block_indices=[2,5,8,11])
@@ -68,6 +68,10 @@ class GeoAware:
                         except Exception as e:
                             print(e)
                             pass
+
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+            torch.backends.cuda.cufft_plan_cache.clear()
 
             img_sd_input = resize(image, target_res=num_patches*16, resize=True, to_pil=True)
             features_sd = process_features_and_mask(sd_model, sd_aug, img_sd_input, input_text=text, mask=False, raw=True)
@@ -129,11 +133,18 @@ class GeoAware:
         timer.end("preprocess")
         with torch.no_grad():
             timer.start("get_processed_features_source")
-            self.source_feat, source_cache_hit = self.get_processed_features(self.source_image, text="bowl", cache_path=source_cache_path, refresh_cache=refresh_cache)
+            result = self.get_processed_features(self.source_image, text="bowl", cache_path=source_cache_path, refresh_cache=refresh_cache)
             timer.end("get_processed_features_source")
+            if result is None:
+                raise RuntimeError("get_processed_features failed for source image (returned None)")
+            self.source_feat, source_cache_hit = result
+
             timer.start("get_processed_features_target")
-            self.target_feat, target_cache_hit = self.get_processed_features(self.target_image, text="pot", cache_path=target_cache_path, refresh_cache=refresh_cache)
+            result = self.get_processed_features(self.target_image, text="pot", cache_path=target_cache_path, refresh_cache=refresh_cache)
             timer.end("get_processed_features_target")
+            if result is None:
+                raise RuntimeError("get_processed_features failed for target image (returned None)")
+            self.target_feat, target_cache_hit = result
             timer.start("upsample")
             self.source_feat_upsample = nn.Upsample(size=(image_size, image_size), mode='bilinear')(self.source_feat).to(secondary_gpu)  # 1, C, H, W
             self.target_feat_upsample = nn.Upsample(size=(image_size, image_size), mode='bilinear')(self.target_feat).to(secondary_gpu)  # 1, C, H, W

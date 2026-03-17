@@ -499,6 +499,8 @@ class Runner:
             create_correspondence_visualization_gdino,
             create_triangulation_visualization_gdino,
             create_bbox_visualization,
+            create_geoaware_visualization,
+            create_mast3r_visualization,
         )
 
         self.prepare_bootstrap()
@@ -549,7 +551,11 @@ class Runner:
                 try:
                     create_correspondence_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
                     create_triangulation_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_geoaware_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_mast3r_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
                     print(f"  Correspondence OK  -> {pipeline_dir}/correspondence/")
+                    print(f"  GeoAware vis       -> {pipeline_dir}/correspondence/geoaware/")
+                    print(f"  Mast3r vis         -> {pipeline_dir}/correspondence/mast3r/")
                 except Exception as e:
                     print(f"  visualisation failed: {e}")
 

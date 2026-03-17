@@ -463,12 +463,14 @@ def run_correspondence_gdino(
             # scene_det = grounding_dino.detect(str(target_image_path), text, box_threshold, text_threshold)
             # demo_det = grounding_dino.detect(str(source_image_path), text, box_threshold, text_threshold)
             if keypoint_idx == 0:
-                text = "bowl"
+                text_demo = "cup"
+                text = "pink bowl"
             else:
+                text_demo = "black bowl"
                 text = "black pot"
             print("*"*100)
             print(keypoint_idx, text)
-            demo_det = grounding_dino.detect(str(source_image_path), text, box_threshold, text_threshold)
+            demo_det = grounding_dino.detect(str(source_image_path), text_demo, box_threshold, text_threshold)
             scene_det = grounding_dino.detect(str(target_image_path), text, box_threshold, text_threshold)
             
             scene_detections[cam][keypoint_idx] = scene_det
@@ -1038,3 +1040,300 @@ def create_triangulation_visualization_gdino(cfg, demo_dir, scene_dir, output_di
             output_dir / f"triangulation_{keypoint_idx}_{best_i}.jpg",
             output_dir / f"triangulation_{keypoint_idx}.jpg",
         )
+
+
+# ---------------------------------------------------------------------------
+# Visualisation: GeoAware per-camera results
+# ---------------------------------------------------------------------------
+
+def create_geoaware_visualization(cfg, demo_dir, scene_dir, output_dir):
+    """
+    For every (keypoint, camera, candidate) triple, save a side-by-side image:
+      LEFT  – demo  image: anchor point (magenta) + DINO bbox (cyan)
+      RIGHT – scene image: GeoAware correspondence point (green) + DINO bbox (cyan)
+
+    Saved to correspondence/geoaware/geoaware_<kp>_<cam>_<i>.jpg
+    The best candidate is also copied to geoaware_<kp>_<cam>.jpg
+    """
+    output_dir = Path(output_dir) / "correspondence"
+    vis_dir = output_dir / "geoaware"
+    vis_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(output_dir / "corres_infos.json") as f:
+        corres_infos = json.load(f)
+    with open(output_dir / "warp_response.json") as f:
+        warp_response = {int(k): v for k, v in json.load(f).items()}
+
+    anchor_pts  = {int(k): v for k, v in corres_infos["anchor_point_candidates"].items()}
+    corres_pts  = {int(k): v for k, v in corres_infos["anchor_correspondence_candidates"].items()}
+    scene_bboxes = {int(k): v for k, v in corres_infos.get("scene_selected_bboxes", {}).items()}
+    demo_bboxes  = {int(k): v for k, v in corres_infos.get("demo_selected_bboxes",  {}).items()}
+
+    keypoint_indices = np.load(demo_dir / "gripper_keypoints.npy")
+
+    for keypoint_idx in range(len(keypoint_indices)):
+        best_i = warp_response[keypoint_idx].get("best_candidate", 0)
+        for cam in cfg.setting.cameras:
+            for i in range(len(anchor_pts[keypoint_idx])):
+                demo_img  = Image.open(demo_dir / "recordings" / "frames" / cam / "00000.jpg").convert("RGBA")
+                scene_img = Image.open(scene_dir / f"{cam}.jpg").convert("RGBA")
+
+                # DINO bboxes (cyan)
+                db = demo_bboxes.get(keypoint_idx, {}).get(cam)
+                sb = scene_bboxes.get(keypoint_idx, {}).get(cam)
+                if db is not None:
+                    demo_img.paste(create_bbox_overlay(*db[:4], color=(0, 255, 255, 160)), (0, 0), create_bbox_overlay(*db[:4], color=(0, 255, 255, 160)))
+                if sb is not None:
+                    scene_img.paste(create_bbox_overlay(*sb[:4], color=(0, 255, 255, 160)), (0, 0), create_bbox_overlay(*sb[:4], color=(0, 255, 255, 160)))
+
+                # Anchor point on demo (magenta)
+                ax, ay = anchor_pts[keypoint_idx][i][cam]
+                demo_img.paste(create_point_overlay(ax, ay, color=(255, 0, 255, 255)), (0, 0), create_point_overlay(ax, ay, color=(255, 0, 255, 255)))
+
+                # GeoAware result on scene (green)
+                cx, cy = corres_pts[keypoint_idx][i][cam]
+                scene_img.paste(create_point_overlay(cx, cy, color=(0, 255, 0, 255)), (0, 0), create_point_overlay(cx, cy, color=(0, 255, 0, 255)))
+
+                best_mark = " ★" if i == best_i else ""
+                combined = concatenate_images(
+                    demo_img.convert("RGB"), scene_img.convert("RGB"),
+                    text1=f"demo anchor  kp={keypoint_idx} {cam}",
+                    text2=f"GeoAware result{best_mark}",
+                )
+                combined.save(vis_dir / f"geoaware_{keypoint_idx}_{cam}_{i}.jpg")
+
+            # Copy best candidate
+            best_path = vis_dir / f"geoaware_{keypoint_idx}_{cam}_{best_i}.jpg"
+            if best_path.exists():
+                shutil.copyfile(best_path, vis_dir / f"geoaware_{keypoint_idx}_{cam}.jpg")
+
+
+# ---------------------------------------------------------------------------
+# Visualisation: Mast3r cross-view correspondences
+# ---------------------------------------------------------------------------
+
+def create_mast3r_visualization(cfg, demo_dir, scene_dir, output_dir):
+    """
+    For each (keypoint, source→target camera pair, candidate), save a side-by-side
+    image showing Mast3r's cross-view correspondence:
+      LEFT  – source image: query point (magenta)
+      RIGHT – target image: Mast3r result (green, or red X if failed)
+
+    Four grids are saved (demo cam1→cam2, demo cam2→cam1,
+                           scene cam1→cam2, scene cam2→cam1):
+      correspondence/mast3r/mast3r_demo_<src>_<tgt>_<kp>_<i>.jpg
+      correspondence/mast3r/mast3r_scene_<src>_<tgt>_<kp>_<i>.jpg
+    Best candidates are also copied without the _<i> suffix.
+    """
+    output_dir = Path(output_dir) / "correspondence"
+    vis_dir = output_dir / "mast3r"
+    vis_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(output_dir / "corres_infos.json") as f:
+        corres_infos = json.load(f)
+    with open(output_dir / "warp_response.json") as f:
+        warp_response = {int(k): v for k, v in json.load(f).items()}
+
+    anchor_pts       = {int(k): v for k, v in corres_infos["anchor_point_candidates"].items()}
+    corres_pts       = {int(k): v for k, v in corres_infos["anchor_correspondence_candidates"].items()}
+    demo_crossview   = {int(k): v for k, v in corres_infos["demo_crossview_correspondence_candidates"].items()}
+    scene_crossview  = {int(k): v for k, v in corres_infos["scene_crossview_correspondence_candidates"].items()}
+
+    keypoint_indices = np.load(demo_dir / "gripper_keypoints.npy")
+    cam_names = list(cfg.setting.cameras.keys())
+    camera_pairs = [(cam_names[0], cam_names[1]), (cam_names[1], cam_names[0])]
+
+    for keypoint_idx in range(len(keypoint_indices)):
+        best_i = warp_response[keypoint_idx].get("best_candidate", 0)
+        n_cands = len(anchor_pts[keypoint_idx])
+
+        for src_cam, tgt_cam in camera_pairs:
+            for i in range(n_cands):
+                # ── DEMO cross-view ──────────────────────────────────────
+                demo_src = Image.open(demo_dir / "recordings" / "frames" / src_cam / "00000.jpg").convert("RGBA")
+                demo_tgt = Image.open(demo_dir / "recordings" / "frames" / tgt_cam / "00000.jpg").convert("RGBA")
+
+                qx, qy = anchor_pts[keypoint_idx][i][src_cam]
+                demo_src.paste(create_point_overlay(qx, qy, color=(255, 0, 255, 255)), (0, 0), create_point_overlay(qx, qy, color=(255, 0, 255, 255)))
+
+                mast3r_xy = demo_crossview[keypoint_idx][i].get(tgt_cam)
+                if mast3r_xy is not None:
+                    mx, my = mast3r_xy
+                    demo_tgt.paste(create_point_overlay(mx, my, color=(0, 255, 0, 255)), (0, 0), create_point_overlay(mx, my, color=(0, 255, 0, 255)))
+                    tgt_label = f"Mast3r → ({mx:.0f},{my:.0f})"
+                else:
+                    tgt_label = "Mast3r FAILED"
+
+                best_mark = " ★" if i == best_i else ""
+                combined = concatenate_images(
+                    demo_src.convert("RGB"), demo_tgt.convert("RGB"),
+                    text1=f"demo {src_cam}  kp={keypoint_idx}",
+                    text2=f"{tgt_label}{best_mark}",
+                )
+                fname = f"mast3r_demo_{src_cam}_{tgt_cam}_{keypoint_idx}_{i}.jpg"
+                combined.save(vis_dir / fname)
+
+                # ── SCENE cross-view ─────────────────────────────────────
+                scene_src = Image.open(scene_dir / f"{src_cam}.jpg").convert("RGBA")
+                scene_tgt = Image.open(scene_dir / f"{tgt_cam}.jpg").convert("RGBA")
+
+                cx, cy = corres_pts[keypoint_idx][i][src_cam]
+                scene_src.paste(create_point_overlay(cx, cy, color=(255, 0, 255, 255)), (0, 0), create_point_overlay(cx, cy, color=(255, 0, 255, 255)))
+
+                mast3r_xy = scene_crossview[keypoint_idx][i].get(tgt_cam)
+                if mast3r_xy is not None:
+                    mx, my = mast3r_xy
+                    scene_tgt.paste(create_point_overlay(mx, my, color=(0, 255, 0, 255)), (0, 0), create_point_overlay(mx, my, color=(0, 255, 0, 255)))
+                    tgt_label = f"Mast3r → ({mx:.0f},{my:.0f})"
+                else:
+                    tgt_label = "Mast3r FAILED"
+
+                combined = concatenate_images(
+                    scene_src.convert("RGB"), scene_tgt.convert("RGB"),
+                    text1=f"scene {src_cam}  kp={keypoint_idx}",
+                    text2=f"{tgt_label}{best_mark}",
+                )
+                fname = f"mast3r_scene_{src_cam}_{tgt_cam}_{keypoint_idx}_{i}.jpg"
+                combined.save(vis_dir / fname)
+
+            # Copy best candidates
+            for prefix, suffix in [("demo", f"mast3r_demo_{src_cam}_{tgt_cam}_{keypoint_idx}_{best_i}.jpg"),
+                                    ("scene", f"mast3r_scene_{src_cam}_{tgt_cam}_{keypoint_idx}_{best_i}.jpg")]:
+                best_path = vis_dir / suffix
+                dest = vis_dir / suffix.replace(f"_{best_i}.jpg", ".jpg")
+                if best_path.exists():
+                    shutil.copyfile(best_path, dest)
+
+
+# ---------------------------------------------------------------------------
+# Visualisation: warped trajectory projected onto target scene cameras
+# ---------------------------------------------------------------------------
+
+def create_trajectory_video(cfg, demo_dir, scene_dir, output_dir):
+    """
+    Project every waypoint of the warped trajectory onto each scene camera
+    and save:
+      - trajectory_<cam>.jpg  — static image with all waypoints overlaid
+      - trajectory_<cam>.mp4  — video, one frame per waypoint
+      - trajectory_both.jpg   — both cameras side by side
+
+    Waypoints are colour-coded green (start) → red (end).
+    Gripper-open steps use a circle; gripper-closed steps use a filled square.
+
+    Saved to  output_dir/trajectory/
+    """
+    output_dir = Path(output_dir)
+    traj_dir = output_dir / "trajectory"
+    traj_dir.mkdir(parents=True, exist_ok=True)
+
+    traj_path = output_dir / "trajectory_final.npy"
+    if not traj_path.exists():
+        # Older location
+        traj_path = demo_dir / "pipeline" / "trajectory_final.npy"
+    if not traj_path.exists():
+        print("create_trajectory_video: trajectory_final.npy not found, skipping.")
+        return
+
+    trajectory = np.load(traj_path)          # (T, 7): x y z roll pitch yaw gripper
+    T = len(trajectory)
+
+    cam_names = list(cfg.setting.cameras.keys())
+    camera_extrinsics = {
+        cam: load_camera_extrinsics(scene_dir, cfg.setting.cameras[cam])
+        for cam in cam_names
+    }
+    camera_intrinsics = {
+        cam: load_camera_intrinsics(scene_dir, cfg.setting.cameras[cam])
+        for cam in cam_names
+    }
+
+    # Load base scene images once
+    base_imgs = {}
+    for cam in cam_names:
+        img_path = scene_dir / f"{cam}.jpg"
+        if img_path.exists():
+            base_imgs[cam] = np.array(Image.open(img_path).convert("RGB"))
+        else:
+            print(f"create_trajectory_video: {img_path} not found, skipping {cam}.")
+
+    if not base_imgs:
+        print("create_trajectory_video: no scene images found.")
+        return
+
+    H, W = next(iter(base_imgs.values())).shape[:2]
+    fps = 10
+
+    # Colour ramp: green (0,220,0) → red (220,0,0)  in BGR for cv2
+    def waypoint_color_bgr(i, total):
+        t = i / max(total - 1, 1)
+        r = int(220 * t)
+        g = int(220 * (1 - t))
+        return (0, g, r)   # BGR
+
+    # Pre-project all waypoints for every camera
+    projected = {cam: [] for cam in cam_names}
+    for cam in cam_names:
+        if cam not in base_imgs:
+            continue
+        K  = camera_intrinsics[cam]
+        Ex = camera_extrinsics[cam]
+        for t in range(T):
+            xyz = trajectory[t, :3]
+            try:
+                px, py = project_world_coord_to_image(xyz, K, Ex)
+                projected[cam].append((int(px), int(py)))
+            except Exception:
+                projected[cam].append(None)
+
+    # Build per-camera video + static image
+    static_imgs = {}
+    for cam in cam_names:
+        if cam not in base_imgs:
+            continue
+
+        pts = projected[cam]
+        base_bgr = cv2.cvtColor(base_imgs[cam], cv2.COLOR_RGB2BGR)
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        vid_path = str(traj_dir / f"trajectory_{cam}.mp4")
+        writer = cv2.VideoWriter(vid_path, fourcc, fps, (W, H))
+
+        canvas = base_bgr.copy()
+        prev_pt = None
+        for i in range(T):
+            pt  = pts[i]
+            col = waypoint_color_bgr(i, T)
+            gripper_open = trajectory[i, 6] > 0.5   # gripper column
+
+            if pt is not None and 0 <= pt[0] < W and 0 <= pt[1] < H:
+                # Draw connecting line
+                if prev_pt is not None:
+                    cv2.line(canvas, prev_pt, pt, col, 1, cv2.LINE_AA)
+                # Draw waypoint marker
+                if gripper_open:
+                    cv2.circle(canvas, pt, 5, col, 2, cv2.LINE_AA)
+                else:
+                    half = 4
+                    cv2.rectangle(canvas, (pt[0]-half, pt[1]-half),
+                                  (pt[0]+half, pt[1]+half), col, -1)
+                prev_pt = pt
+
+            # Write frame (accumulated path so far)
+            frame = canvas.copy()
+            cv2.putText(frame, f"step {i+1}/{T}  {'open' if gripper_open else 'close'}",
+                        (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2, cv2.LINE_AA)
+            writer.write(frame)
+
+        writer.release()
+
+        # Static image = final accumulated canvas
+        static_imgs[cam] = canvas
+        cv2.imwrite(str(traj_dir / f"trajectory_{cam}.jpg"), canvas)
+
+    # Side-by-side static image
+    if len(static_imgs) == 2:
+        cam1, cam2 = cam_names
+        if cam1 in static_imgs and cam2 in static_imgs:
+            side_by_side = np.concatenate([static_imgs[cam1], static_imgs[cam2]], axis=1)
+            cv2.imwrite(str(traj_dir / "trajectory_both.jpg"), side_by_side)
+
+    print(f"Trajectory video saved → {traj_dir}/")
