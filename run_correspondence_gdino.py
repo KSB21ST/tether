@@ -96,7 +96,7 @@ class GroundingDinoManager(BaseManager):
 GroundingDinoManager.register("GroundingDino")
 
 
-def load_grounding_dino(host="192.168.141.97", port=50033):
+def load_grounding_dino(host="192.168.141.108", port=50033):
     manager = GroundingDinoManager(address=(host, port), authkey=b"groundingdino")
     manager.connect()
     return manager.GroundingDino()
@@ -111,6 +111,9 @@ grounding_dino = load_grounding_dino()
 # Bounding-box helpers
 # ---------------------------------------------------------------------------
 
+GEOAWARE_BBOX_PADDING = 10  # pixels to shrink each side of the bounding box inward
+
+
 def bbox_to_geoaware_mask(
     x1: float,
     y1: float,
@@ -120,6 +123,7 @@ def bbox_to_geoaware_mask(
     image_h: int,
     crop: list,
     image_size: int = GEO_AWARE_IMAGE_SIZE,
+    padding: int = GEOAWARE_BBOX_PADDING,
 ) -> np.ndarray | None:
     """
     Convert a bounding box from full-image pixel coordinates to a binary mask
@@ -134,12 +138,26 @@ def bbox_to_geoaware_mask(
         crop            : [left, top, right, bottom] pixel offsets applied by
                           GeoAware's load_images() (cfg.setting.image_crop).
         image_size      : GeoAware internal resolution (default 480).
+        padding         : Pixels to shrink the bbox inward on each side (default 20).
+                          Keeps GeoAware searching strictly inside the detected object.
 
     Returns:
         Float32 numpy array of shape (image_size, image_size) with 1 inside
         the bbox and 0 outside, or None if the bbox does not overlap the
         cropped region.
     """
+    # Shrink bbox inward by padding; if the box collapses, fall back to original bbox
+    x1_p, y1_p, x2_p, y2_p = x1 + padding, y1 + padding, x2 - padding, y2 - padding
+    if x2_p > x1_p and y2_p > y1_p:
+        x1, y1, x2, y2 = x1_p, y1_p, x2_p, y2_p
+    else:
+        bbox_w, bbox_h = x2 - x1, y2 - y1
+        print(
+            f"  GeoAware bbox padding fallback: "
+            f"bbox [{bbox_w:.0f}x{bbox_h:.0f}px] too small for {padding}px inward padding "
+            f"— using original bbox without padding."
+        )
+
     crop_left, crop_top, crop_right, crop_bottom = int(crop[0]), int(crop[1]), int(crop[2]), int(crop[3])
 
     # Cropped image dimensions
@@ -464,10 +482,10 @@ def run_correspondence_gdino(
             # demo_det = grounding_dino.detect(str(source_image_path), text, box_threshold, text_threshold)
             if keypoint_idx == 0:
                 text_demo = "cup"
-                text = "pink bowl"
+                text = "yellow pineapple"
             else:
                 text_demo = "black bowl"
-                text = "black pot"
+                text = "purple bowl"
             print("*"*100)
             print(keypoint_idx, text)
             demo_det = grounding_dino.detect(str(source_image_path), text_demo, box_threshold, text_threshold)
@@ -577,12 +595,13 @@ def run_correspondence_gdino(
                     print(
                         f"  GeoAware mask for kp={keypoint_idx}, {cam}: "
                         f"bbox=[{x1:.0f},{y1:.0f},{x2:.0f},{y2:.0f}] "
+                        f"(-{GEOAWARE_BBOX_PADDING}px inward) "
                         f"'{label}' conf={score:.2f}"
                     )
                 else:
                     print(
-                        f"  Grounding-DINO box outside crop for kp={keypoint_idx}, {cam}; "
-                        f"using full image."
+                        f"  GeoAware mask skipped for kp={keypoint_idx}, {cam}: "
+                        f"bbox outside cropped region — using full image."
                     )
             else:
                 print(

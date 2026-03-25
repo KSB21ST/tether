@@ -228,10 +228,10 @@ def check_trajectory():
             create_mast3r_visualization,
         )
         create_bbox_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
+        create_geoaware_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
+        create_correspondence_visualization_gdino(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
         if warp_result is not None:
-            create_correspondence_visualization_gdino(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
             create_triangulation_visualization_gdino(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
-            create_geoaware_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
             create_mast3r_visualization(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
             annotate_warped_trajectory(_runner.cfg, _demo_dir, _scene_dir, output_dir=pipeline_dir)
 
@@ -283,7 +283,8 @@ def check_trajectory():
 
     # 5. Positions changed → return xyz waypoints (trajectory already prepared in 2b)
     _last_pos = new_pos
-    xyz = np.load(_demo_dir / "pipeline" / "trajectory_final_xyz.npy")
+    # xyz = np.load(_demo_dir / "pipeline" / "trajectory_final_xyz.npy")
+    xyz = np.load(_demo_dir / "pipeline" / "trajectory_final.npy")
     _banner(f"★  KEYPOINTS CHANGED  →  sending {len(xyz)} waypoints  →  OmniGuide", char="★")
     return jsonify({"changed": True, "waypoints": xyz.tolist()})
 

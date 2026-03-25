@@ -33,6 +33,6 @@ oob_bounds:
   y: [-0.6, 0.6]
   z: [-0.1, 1]
 
-control_hz: 15
+control_hz: 15 # 15
 anchor_offsets: [0.0]
 mast3r_error_thres: 10
