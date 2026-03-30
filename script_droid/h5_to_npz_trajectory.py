@@ -102,9 +102,9 @@ if __name__ == "__main__":
     
 """
 # Output next to the input (as trajectory.npz)
-python h5_to_npz_trajectory.py data_real/2026-03-03_01-24-23/trajectory.h5
+python h5_to_npz_trajectory.py  data_real/2026-03-03_01-24-23/trajectory.h5
 
 # Or specify output path
-python h5_to_npz_trajectory.py data_real/2026-03-03_01-24-23/trajectory.h5 data_real/2026-03-03_01-24-23/trajectory.npz
+python script_droid/h5_to_npz_trajectory.py data_real/2026-03-03_01-24-23/trajectory.h5 data_real/2026-03-03_01-24-23/trajectory.npz
 """
 

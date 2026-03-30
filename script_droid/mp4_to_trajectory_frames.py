@@ -223,3 +223,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+
+# Extract frames for all DROID cameras in demo_dir and save to a specific output directory
+python script_droid/mp4_to_trajectory_frames.py /home/kim34/projects/tether/data_real/demos/wipe-droid/Fri_Dec_15_09:46:16_2023
+"""

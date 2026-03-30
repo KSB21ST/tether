@@ -533,6 +533,7 @@ class Runner:
                 # but re-render from JSON in case they need refreshing)
                 try:
                     create_bbox_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_geoaware_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
                     print(f"  Bounding-box visualisations -> {pipeline_dir}/correspondence/bboxes/")
                 except Exception as e:
                     print(f"  bbox visualisation failed: {e}")
@@ -549,10 +550,10 @@ class Runner:
                 warped_trajectory, warping_infos, warp = warp_result
 
                 try:
-                    create_correspondence_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
-                    create_triangulation_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
                     create_geoaware_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_correspondence_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
                     create_mast3r_visualization(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
+                    create_triangulation_visualization_gdino(self.cfg, demo_dir, scene_dir, output_dir=pipeline_dir)
                     print(f"  Correspondence OK  -> {pipeline_dir}/correspondence/")
                     print(f"  GeoAware vis       -> {pipeline_dir}/correspondence/geoaware/")
                     print(f"  Mast3r vis         -> {pipeline_dir}/correspondence/mast3r/")

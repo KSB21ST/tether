@@ -10,7 +10,8 @@ demo_names:
   # pineapple-shelf-table: "pick up pineapple from shelf and place on table"
   # pineapple-table-shelf: "pick up pineapple from table and place on shelf"
   # pineapple-table-bowl-droid: "pick upright bowl from table and place on left bowl"
-  cup-bowl-droid: "pick up cup from table and place on the bowl"
+  # cup-bowl-droid: "pick up cup from table and place on the bowl"
+  wipe-table-droid-4: "wipe the table with the cloth"
 
 gripper_len: 0.18
 

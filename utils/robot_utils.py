@@ -43,7 +43,8 @@ def collect_scene_image(cfg):
     target_scene_dir.mkdir(parents=True, exist_ok=True)
     
     # 4. Define the path to your actual local image
-    source_image_path = Path("/home/kim34/projects/tether/data_real/target_pos/recordings/frames/varied_camera_1/00000.jpg")
+    # source_image_path = Path("/home/kim34/projects/tether/data_real/target_pos/recordings/frames/varied_camera_1/00000.jpg")
+    source_image_path = Path("/home/kim34/projects/tether/data_real/runs/2026-03-26_23-25-58_wiping_bowl_2/scenes_server/omniguide/varied_camera_1.jpg")
     
     if not source_image_path.exists():
         print(f"Could not find source image at {source_image_path}!")
@@ -53,11 +54,11 @@ def collect_scene_image(cfg):
     # for camera_name, camera_id in cfg.setting.cameras.items():
     #     destination_path = target_scene_dir / f"{camera_name}.jpg"
     #     shutil.copyfile(source_image_path, destination_path)
-    source_image_path = "/home/kim34/projects/tether/data_real/target_pos/recordings/frames/varied_camera_1/00000.jpg"
+    source_image_path = "/home/kim34/projects/tether/data_real/runs/2026-03-26_23-25-58_wiping_bowl_2/scenes_server/omniguide/varied_camera_1.jpg"
     destination_path = target_scene_dir / "varied_camera_1.jpg"
     shutil.copyfile(source_image_path, destination_path)
     
-    source_image_path = "/home/kim34/projects/tether/data_real/target_pos/recordings/frames/varied_camera_2/00000.jpg"
+    source_image_path = "/home/kim34/projects/tether/data_real/runs/2026-03-26_23-25-58_wiping_bowl_2/scenes_server/omniguide/varied_camera_2.jpg"
     destination_path = target_scene_dir / "varied_camera_2.jpg"
     shutil.copyfile(source_image_path, destination_path)
         

@@ -25,6 +25,7 @@ Pipeline overview
    - triangulation_<kp>_<offset>.jpg  – epipolar verification (same)
 """
 
+import math
 import os
 import shutil
 from pathlib import Path
@@ -111,7 +112,7 @@ grounding_dino = load_grounding_dino()
 # Bounding-box helpers
 # ---------------------------------------------------------------------------
 
-GEOAWARE_BBOX_PADDING = 10  # pixels to shrink each side of the bounding box inward
+GEOAWARE_BBOX_PADDING = 15  # pixels to shrink each side of the bounding box inward
 
 
 def bbox_to_geoaware_mask(
@@ -180,10 +181,10 @@ def bbox_to_geoaware_mask(
     pad_y = (long_side - h_c) / 2.0
     scale = long_side / image_size  # pixels per feature-map cell
 
-    x1_r = int((x1_c + pad_x) / scale)
-    y1_r = int((y1_c + pad_y) / scale)
-    x2_r = int((x2_c + pad_x) / scale)
-    y2_r = int((y2_c + pad_y) / scale)
+    x1_r = math.ceil((x1_c + pad_x) / scale)
+    y1_r = math.ceil((y1_c + pad_y) / scale)
+    x2_r = math.floor((x2_c + pad_x) / scale)
+    y2_r = math.floor((y2_c + pad_y) / scale)
 
     # Clamp to valid feature-map range
     x1_r = max(0, min(image_size, x1_r))
@@ -481,11 +482,14 @@ def run_correspondence_gdino(
             # scene_det = grounding_dino.detect(str(target_image_path), text, box_threshold, text_threshold)
             # demo_det = grounding_dino.detect(str(source_image_path), text, box_threshold, text_threshold)
             if keypoint_idx == 0:
-                text_demo = "cup"
-                text = "yellow pineapple"
+                # text_demo = "cup"
+                # text = "yellow pineapple"
+                text_demo = "white towl"
+                text = "crumpled grey cloth"
             else:
-                text_demo = "black bowl"
-                text = "purple bowl"
+                # text_demo = "black bowl"
+                text = "crumpled grey cloth"
+                text_demo = ""
             print("*"*100)
             print(keypoint_idx, text)
             demo_det = grounding_dino.detect(str(source_image_path), text_demo, box_threshold, text_threshold)
@@ -767,10 +771,12 @@ def run_correspondence_gdino(
                     "scene_crossview_corres_dist2": float(scene_crossview_corres_dist2),
                 })
 
-            if anchor_dist_err > 0.1 or corres_dist_err > 0.1:
+            if anchor_dist_err > 0.1 or corres_dist_err > 0.25:
+                print("anchor_dist_err, corres_dist_err", anchor_dist_err, corres_dist_err)
                 warp_response[keypoint_idx]["infos"][i]["error"] = "triangulation_distance_error"
                 continue
             if crossview_corres_dist_err1 > 0.1 or crossview_corres_dist_err2 > 0.1:
+                print("crossview_corres_dist_err1, crossview_corres_dist_err2", crossview_corres_dist_err1, crossview_corres_dist_err2)
                 warp_response[keypoint_idx]["infos"][i]["error"] = "crossview_distance_error"
                 continue
             if check_pos_oob(corres_pos, cfg.setting.oob_bounds):

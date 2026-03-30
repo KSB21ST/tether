@@ -1,4 +1,80 @@
 Configured Gemini model gemini-robotics-er-1.5-preview
 Configured Gemini model gemini-robotics-er-1.5-preview
 action_library.json does not exist, skipping reload
-  0%|          | 0/1 [00:00<?, ?it/s]
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:39<00:00, 39.08s/it]100%|██████████| 1/1 [00:39<00:00, 39.09s/it]
+
+════════════════════════════════════════════════════════════
+  TETHER SERVER READY
+════════════════════════════════════════════════════════════
+  demo      : Fri_Dec_15_09:46:16_2023
+  threshold : 0.02 m
+────────────────────────────────────────────────────────────
+  All interfaces:
+    altname enp2s0f0  158.130.118.247
+    altname enp4s0f0np0  192.168.141.104 ◄ internal
+────────────────────────────────────────────────────────────
+  ★ INTERNAL IP  :  192.168.141.104
+  ★ PORT         :  8000
+────────────────────────────────────────────────────────────
+  Set in OmniGuide:
+  TetherClient(base_url='http://192.168.141.104:8000')
+════════════════════════════════════════════════════════════
+
+ * Serving Flask app 'tether_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8000
+ * Running on http://158.130.118.247:8000
+[33mPress CTRL+C to quit[0m
+
+════════════════════════════════════════════════════════════
+  [#1  16:54:39]  OmniGuide → Tether  /check_trajectory
+════════════════════════════════════════════════════════════
+  ┌─ Received images from OmniGuide  (RECEIVED)
+  │   [recv] left_image             shape=(720, 1280, 3)  dtype=uint8  min=  0  max=255  mean=92.5  chk=0x0f402a74
+  │   left_image    already 1280×720  (no resize needed)
+  │   [recv] right_image            shape=(720, 1280, 3)  dtype=uint8  min=  0  max=255  mean=98.6  chk=0x103f265c
+  │   right_image   already 1280×720  (no resize needed)
+  ┌─ Verification  (READ BACK FROM DISK)
+  │   [disk] varied_camera_1.jpg    shape=(720, 1280, 3)  dtype=uint8  min=  0  max=255  mean=92.5  chk=0x0f3fa504
+  │   varied_camera_1       shape_match=True  max_pixel_err=47  [✗ MISMATCH]
+  │   [disk] varied_camera_2.jpg    shape=(720, 1280, 3)  dtype=uint8  min=  0  max=255  mean=98.6  chk=0x103ecac9
+  │   varied_camera_2       shape_match=True  max_pixel_err=60  [✗ MISMATCH]
+  ┌─ Running DINO correspondence + warp
+Running correspondence with Grounding-DINO
+Running Grounding-DINO detection on scene and demo images...
+****************************************************************************************************
+0 crumpled grey cloth
+  keypoint 0, varied_camera_1: scene=1 boxes, demo=1 boxes  (text='crumpled grey cloth')
+****************************************************************************************************
+1 purple bowl
+  keypoint 1, varied_camera_1: scene=1 boxes, demo=1 boxes  (text='purple bowl')
+****************************************************************************************************
+0 crumpled grey cloth
+  keypoint 0, varied_camera_2: scene=1 boxes, demo=1 boxes  (text='crumpled grey cloth')
+****************************************************************************************************
+1 purple bowl
+  keypoint 1, varied_camera_2: scene=1 boxes, demo=1 boxes  (text='purple bowl')
+Saving bounding-box visualisations to /home/kim34/projects/tether/data_real/runs/2026-03-26_16-52-45/demos/Fri_Dec_15_09:46:16_2023/pipeline/correspondence/bboxes ...
+GeoAware cache hit (source, target): True, False
+  GeoAware mask for kp=0, varied_camera_1: bbox=[531,490,708,679] (-10px inward) 'crumpled grey cloth' conf=0.71
+  GeoAware mask for kp=1, varied_camera_1: bbox=[715,428,797,498] (-10px inward) 'purple bowl' conf=0.61
+GeoAware cache hit (source, target): True, False
+  GeoAware mask for kp=0, varied_camera_2: bbox=[361,405,545,525] (-10px inward) 'crumpled grey cloth' conf=0.56
+  GeoAware mask for kp=1, varied_camera_2: bbox=[541,498,645,593] (-10px inward) 'purple bowl' conf=0.77
+Mast3r demo cache hit: True
+Mast3r demo cache hit: True
+Mast3r scene cache hit: False
+Mast3r scene cache hit: False
+Failed to find correspondence anchor for keypoint 0
+Errors: triangulation_distance_error
+run_correspondence_gdino: 5.98s
+  ┌─ Saving visualizations
+  │   scene images  → /home/kim34/projects/tether/data_real/runs/2026-03-26_16-52-45/demos/Fri_Dec_15_09:46:16_2023/pipeline_history/step_0001_2026-03-26_16-54-47/scene_images/
+  │   visualizations → /home/kim34/projects/tether/data_real/runs/2026-03-26_16-52-45/demos/Fri_Dec_15_09:46:16_2023/pipeline_history/step_0001_2026-03-26_16-54-47/
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ✗  CORRESPONDENCE FAILED  →  changed=False
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+192.168.141.97 - - [26/Mar/2026 16:54:48] "POST /check_trajectory HTTP/1.1" 200 -
