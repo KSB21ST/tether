@@ -97,7 +97,7 @@ class GroundingDinoManager(BaseManager):
 GroundingDinoManager.register("GroundingDino")
 
 
-def load_grounding_dino(host="192.168.141.108", port=50033):
+def load_grounding_dino(host="192.168.141.65", port=50033):
     manager = GroundingDinoManager(address=(host, port), authkey=b"groundingdino")
     manager.connect()
     return manager.GroundingDino()
@@ -113,6 +113,8 @@ grounding_dino = load_grounding_dino()
 # ---------------------------------------------------------------------------
 
 GEOAWARE_BBOX_PADDING = 15  # pixels to shrink each side of the bounding box inward
+KEYPOINT_DEMO_TEXTS = ["cloth", "sink by shelf"]
+KEYPOINT_TARGET_TEXTS = ["crumpled grey cloth", "purple bowl"]
 
 
 def bbox_to_geoaware_mask(
@@ -484,12 +486,12 @@ def run_correspondence_gdino(
             if keypoint_idx == 0:
                 # text_demo = "cup"
                 # text = "yellow pineapple"
-                text_demo = "white towl"
-                text = "crumpled grey cloth"
+                text_demo = KEYPOINT_DEMO_TEXTS[0]
+                text = KEYPOINT_TARGET_TEXTS[0]
             else:
                 # text_demo = "black bowl"
-                text = "crumpled grey cloth"
-                text_demo = ""
+                text = KEYPOINT_TARGET_TEXTS[1]
+                text_demo =KEYPOINT_DEMO_TEXTS[1]
             print("*"*100)
             print(keypoint_idx, text)
             demo_det = grounding_dino.detect(str(source_image_path), text_demo, box_threshold, text_threshold)
@@ -775,10 +777,10 @@ def run_correspondence_gdino(
                 print("anchor_dist_err, corres_dist_err", anchor_dist_err, corres_dist_err)
                 warp_response[keypoint_idx]["infos"][i]["error"] = "triangulation_distance_error"
                 continue
-            if crossview_corres_dist_err1 > 0.1 or crossview_corres_dist_err2 > 0.1:
-                print("crossview_corres_dist_err1, crossview_corres_dist_err2", crossview_corres_dist_err1, crossview_corres_dist_err2)
-                warp_response[keypoint_idx]["infos"][i]["error"] = "crossview_distance_error"
-                continue
+            # if crossview_corres_dist_err1 > 0.1 or crossview_corres_dist_err2 > 0.1:
+            #     print("crossview_corres_dist_err1, crossview_corres_dist_err2", crossview_corres_dist_err1, crossview_corres_dist_err2)
+            #     warp_response[keypoint_idx]["infos"][i]["error"] = "crossview_distance_error"
+            #     continue
             if check_pos_oob(corres_pos, cfg.setting.oob_bounds):
                 warp_response[keypoint_idx]["infos"][i]["error"] = "out_of_bounds"
                 continue

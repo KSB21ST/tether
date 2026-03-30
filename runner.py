@@ -14,18 +14,22 @@ import subprocess
 from deepdiff import DeepDiff
 import os
 
-from extract_keypoint_trajectory import extract_keypoint_trajectory 
+# from extract_keypoint_trajectory import extract_keypoint_trajectory 
+from extract_keypoint_trajectory_dino import extract_keypoint_trajectory_dino
 from annotate_trajectory import annotate_demo_trajectory, annotate_demo_trajectory_droid, annotate_rollout_trajectory, annotate_warped_trajectory
 from query_gemini import query_gemini_evaluate_success, query_gemini_plan_actions
 from run_correspondence import run_correspondence, create_correspondence_visualization, create_triangulation_visualization
 from warp_trajectory import warp_trajectory
 from ucb import UCB
+from run_correspondence_gdino import grounding_dino as _gd
 
 from utils.vlm_utils import VlmWrapper
 from utils.robot_utils import collect_scene_image, send_trajectory
 from utils.timer_utils import Timer, timer
 from utils.statistics_tracker import StatisticsTracker
 from utils.misc_utils import is_valid_rollout, prepare_trajectory
+
+KEYPOINT_GROUNDING_TEXTS = ["cloth", "sink under faucet"]
 
 
 class Runner:
@@ -177,7 +181,12 @@ class Runner:
                 shutil.copytree(demo_dir, self.cfg.demo_path / demo_dir.name)
                 demo_dir = self.cfg.demo_path / demo_dir.name
                 prepare_trajectory(self.cfg, demo_dir, direction=1, output_dir=demo_dir)
-                extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+                # extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+                extract_keypoint_trajectory_dino(
+                    self.cfg, demo_dir, output_dir=demo_dir,
+                    grounding_dino=_gd,
+                    grounding_texts=KEYPOINT_GROUNDING_TEXTS,
+                )
                 use_droid = getattr(self.cfg.setting, "use_droid", False)
                 if use_droid:
                     annotate_demo_trajectory_droid(self.cfg, demo_dir, output_dir=demo_dir)
@@ -201,7 +210,12 @@ class Runner:
         pipeline_dir.mkdir()
 
         prepare_trajectory(self.cfg, demo_dir, direction=1, output_dir=demo_dir)
-        keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+        # keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+        keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory_dino(
+            self.cfg, demo_dir, output_dir=demo_dir,
+            grounding_dino=_gd,       # already loaded in runner.py
+            grounding_texts=KEYPOINT_GROUNDING_TEXTS,   # or from metadata["grounding_texts"]
+        )
         gripper_indices = np.sort(np.concatenate((open_indices, close_indices)))
         warp = run_correspondence(self.cfg, gripper_indices, demo_dir, scene_dir, output_dir=pipeline_dir)
         if warp is None:
@@ -223,7 +237,12 @@ class Runner:
         pipeline_dir.mkdir()
 
         prepare_trajectory(self.cfg, demo_dir, direction=1, output_dir=demo_dir)
-        keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+        # keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory(self.cfg, demo_dir, output_dir=demo_dir)
+        keypoint_indices, open_indices, close_indices = extract_keypoint_trajectory_dino(
+            self.cfg, demo_dir, output_dir=demo_dir,
+            grounding_dino=_gd,       # already loaded in runner.py
+            grounding_texts=KEYPOINT_GROUNDING_TEXTS,   # or from metadata["grounding_texts"]
+        )
         gripper_indices = np.sort(np.concatenate((open_indices, close_indices)))
         warp = run_correspondence_gdino(
             self.cfg, gripper_indices, demo_dir, scene_dir,
@@ -267,7 +286,12 @@ class Runner:
         if (self.cfg.exp_path / "transcript_decision.md").exists():
             (self.cfg.exp_path / "transcript_decision.md").rename(rollout_dir / f"transcript_decision.md")
         prepare_trajectory(self.cfg, rollout_dir, direction=1, output_dir=rollout_dir)
-        keypoint_indices, _, _ = extract_keypoint_trajectory(self.cfg, rollout_dir, output_dir=rollout_dir)
+        # keypoint_indices, _, _ = extract_keypoint_trajectory(self.cfg, rollout_dir, output_dir=rollout_dir)
+        keypoint_indices, _, _ = extract_keypoint_trajectory_dino(
+            self.cfg, rollout_dir, output_dir=rollout_dir,
+            grounding_dino=_gd,       # already loaded in runner.py
+            grounding_texts=KEYPOINT_GROUNDING_TEXTS,   # or from metadata["grounding_texts"]
+        )
         annotate_rollout_trajectory(self.cfg, rollout_dir, demo_dir, output_dir=rollout_dir)
 
         if evaluate:
